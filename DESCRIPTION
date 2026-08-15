@@ -17,8 +17,8 @@ Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-URL: https://github.com/flr/FLBacktest
-BugReports: https://github.com/flr/FLBacktest/issues
+URL: https://github.com/laurieKell/FLBacktest
+BugReports: https://github.com/laurieKell/FLBacktest/issues
 Depends:
     R (>= 4.0.0),
     methods,
