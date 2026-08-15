@@ -1,0 +1,105 @@
+% Methods fragment for peer-reviewed papers using FLBacktest
+% Include with: \input{path/to/methods-backtest.tex}
+% Or copy subsections into the host paper's Methods section.
+
+\section{Methods}
+\label{sec:methods-backtest}
+
+\subsection{Scope}
+
+The analysis evaluates harvest control rules (HCRs) with a historical
+closed-loop backtest implemented in the FLR package \texttt{FLBacktest}.
+The procedure separates two questions that are often conflated: whether the
+assessment and advice rule are robust under historical uncertainty, and
+whether realised management outcomes differ because advice was not followed.
+
+\subsection{Overview of the backtest}
+
+For each operating-model stock and each advice year \(t\) in a historical
+window \([t_0,T]\):
+\begin{enumerate}
+  \item \textbf{Perceive.} Form a management-procedure view of stock status
+        using only information available at \(t\) (perfect information,
+        short-cut assessment error, or a full re-assessment / peel).
+  \item \textbf{Advise.} Apply the HCR in force at \(t\), with that year's
+        reference points, to obtain catch (or \(F\)) advice for year
+        \(t{+}1\).
+  \item \textbf{Implement.} Project the operating model forward under the
+        advised control (optionally with implementation error).
+  \item \textbf{Compare.} Contrast simulated SSB, \(F\), and catch with the
+        realised historical path over the same years.
+\end{enumerate}
+Repeating these steps for successive \(t\) builds a counterfactual path under
+consistent adherence to advice as it was understood at the time
+\citep{Punt2016MSE,Butterworth2014}.
+
+\subsection{Operating model}
+
+The operating model (OM) is an age-structured \texttt{FLStock} conditioned on
+a historical assessment (or a set of plausible assessments). A stock--recruitment
+relationship is represented as an \texttt{FLBRP} equilibrium for short-term
+forecasts and closed-loop projections \citep{Kell2007FLR}. Multiple OMs may be
+retained for robustness (e.g.\ alternative natural mortality or productivity).
+Stochastic recruitment uses multiplicative deviations; papers should state
+whether deviations are aleatory or include epistemic trend components.
+
+\subsection{Observation and estimation error}
+
+Three nested observation models are available.
+
+\paragraph{Perfect information.}
+The management procedure observes true OM status without error. This isolates
+HCR behaviour from assessment error and is a diagnostic, not a realistic advice
+process.
+
+\paragraph{Short-cut assessment error.}
+Multiplicative error is imposed on the HCR metric (typically SSB), conditioned
+on retrospective peels. An ARIMA (or AR(1)) model fitted to retrospective bias
+is simulated across years and iterations
+\citep{ICES2013EqSim,Kell2016}, avoiding a full re-assessment each year while
+retaining empirically motivated error structure.
+
+\paragraph{Full feedback.}
+Each year the management procedure updates an assessment from contemporaneous
+catch and survey data generated from the OM, then applies the HCR to the
+estimates, jointly including observation, estimation, and advice error
+\citep{Punt2016MSE}.
+
+\subsection{Harvest control rule}
+
+The base HCR is the ICES Category~1 MSY hockey-stick: \(F=F_{\mathrm{MSY}}\)
+above \(MSYB_{\mathrm{trigger}}\), reduced linearly towards \(B_{\lim}\), and
+zero at or below \(B_{\lim}\) \citep{ICES2021Advice}. Catch advice is obtained
+by short-term projection at the advised \(F\). Optional year-to-year TAC
+stability constraints may apply when SSB is above a stated threshold.
+Reference points are those used for advice in year \(t\); benchmark years are
+structural breaks when reference points are redefined.
+
+\subsection{Closed-loop projection}
+
+Given advised catch (or \(F\)) for year \(t{+}1\), the OM is projected with
+FLR forward methods under the chosen recruitment deviations. Management and
+data lags are stated explicitly. Perfect-management counterfactuals set
+realised catch equal to advised catch; implementation error may be added when
+required.
+
+\subsection{Performance metrics}
+
+Realised and counterfactual histories are compared using:
+\begin{itemize}
+  \item \textbf{Biological status} --- time (or probability) below
+        \(B_{\lim}\) and \(MSYB_{\mathrm{trigger}}\);
+  \item \textbf{Exploitation} --- \(F\) relative to \(F_{\mathrm{MSY}}\);
+  \item \textbf{Yield and stability} --- mean/cumulative catch and interannual
+        variability;
+  \item \textbf{Risk trade-offs} --- yield versus probability of falling below
+        limit reference points \citep{Punt2016MSE}.
+\end{itemize}
+
+\subsection{Software}
+
+Analyses use FLR (\texttt{FLCore}, \texttt{FLBRP}, \texttt{FLasher},
+\texttt{ggplotFL}) and \texttt{FLBacktest} (\texttt{hcrICES}/\texttt{backtest},
+\texttt{shortcut}, \texttt{retroBias}, \texttt{backtestResults}). Conditioned
+OMs, scenario grids, seeds, and session information are archived so that
+tables and figures can be regenerated from saved results.

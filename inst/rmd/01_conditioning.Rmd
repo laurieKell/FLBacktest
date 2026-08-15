@@ -1,0 +1,91 @@
+---
+title: "Supplementary Material: Operating-model conditioning"
+subtitle: "Shared text and FLBacktest workflow for peer-reviewed papers"
+author: "Laurence Kell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+  word_document:
+    toc: true
+---
+
+```{r knitr, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      eval = FALSE)
+```
+
+# Purpose
+
+This note documents the **shared** conditioning steps used by papers that run
+historical HCR backtests with **FLBacktest**. Application repositories supply
+stock-specific assessments, reference points, and scenario labels; the package
+supplies the reusable helpers below.
+
+Host papers should `\input` or child-document this file (or copy the prose into
+a LaTeX supplement) and replace the placeholders with case-study detail.
+
+# Conditioning pipeline
+
+1. Build an age-structured operating model (`FLStock`) from the assessment
+   (or a set of plausible assessments).
+2. Ensure projection slots are complete for `FLasher` (catch, landings,
+   discards, weights, maturity, natural mortality, selectivity).
+3. Fit a stock–recruitment relationship and represent it as an `FLBRP`
+   equilibrium for short-term forecasts and closed-loop projections.
+4. Derive HCR parameters (`FLPar`) from advice-year reference points.
+5. Optionally expand epistemic uncertainty (assessment iters, alternative \(M\),
+   recruitment regimes) and build multiplicative recruitment deviations.
+
+# Package helpers
+
+```{r helpers}
+library(FLCore)
+library(FLBRP)
+library(FLBacktest)
+
+## HCR parameters from reference-point series (FLQuants or named list)
+## Expected names: fmsy / ftar, msybtrigger / btrig, blim
+# par <- hcrParams(refs)
+
+## Mass-based natural mortality (optional OM hypothesis)
+# m(om) <- lorenzenM(om)
+
+## Assessment uncertainty iters via FLfse (requires Suggested packages)
+# omU <- omIters(om, n = 100)
+
+## Recruitment deviations (AR(1) about lowess; optional epistemic trend)
+# rsd <- recDevs(residuals(sr), nits = 100, trend = FALSE)
+# sr_deviances <- exp(rsd)
+
+## Leave-one-out SR residuals (diagnostics / alternative deviations)
+# loo <- looResiduals(sr)
+```
+
+# What the application must supply
+
+| Object | Role |
+|--------|------|
+| `om` / `omIters` | Conditioned `FLStock` (possibly multi-iter or multi-OM list) |
+| `eq` / `eqs` | Fitted `FLBRP` (or named list by OM / regime) |
+| `refs` → `params` | Advice-year \(F_{\mathrm{MSY}}\), \(MSYB_{\mathrm{trigger}}\), \(B_{\lim}\) |
+| `sr_deviances` | Multiplicative recruitment process for the backtest window |
+| Scenario grid | Optional `data.frame` of OM × regime (or other factors) for `backtest()` |
+
+# Case-study checklist (fill in host paper)
+
+- Assessment software and terminal year(s)
+- Historical conditioning window and any structural breaks (benchmarks)
+- Natural mortality hypotheses retained as OMs
+- Stock–recruit form(s) and how residuals enter the closed loop
+  (aleatory vs epistemic)
+- Source of reference points (SAG, advice sheets, assessment report)
+
+# Software
+
+Conditioning uses FLR (`FLCore`, `FLBRP`) and **FLBacktest** helpers
+`hcrParams()`, `lorenzenM()`, `omIters()`, `recDevs()`, and
+`looResiduals()`. Full SAM uncertainty expansion additionally requires
+**FLfse** / **stockassessment**.

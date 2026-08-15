@@ -1,0 +1,57 @@
+Package: FLBacktest
+Type: Package
+Title: Backtest Management Strategy Evaluation for FLR
+Version: 0.0.3
+Authors@R: 
+    person("Laurence", "Kell",
+           email = "laurie@kell.es",
+           role = c("aut", "cre"))
+Description: Conducts retrospective (backtest) Management Strategy Evaluation
+    for fisheries managed under harvest control rules. Provides S4 generic
+    methods for closed-loop HCR feedback, short-cut and full observation
+    models, retrospective bias, SAM indices, and reusable conditioning
+    helpers (HCR parameters, Lorenzén M, recruitment deviations, OM
+    uncertainty) for use by applications.
+License: GPL (>= 2)
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+URL: https://github.com/flr/FLBacktest
+BugReports: https://github.com/flr/FLBacktest/issues
+Depends:
+    R (>= 4.0.0),
+    methods,
+    FLCore (>= 2.6.16),
+    FLBRP (>= 2.5.9),
+    FLasher (>= 0.7.0)
+Imports:
+    stats,
+    utils
+Suggests:
+    forecast,
+    parallel,
+    doParallel,
+    foreach,
+    FLfse,
+    stockassessment,
+    plyr,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown,
+    ggplotFL
+VignetteBuilder: knitr
+Collate:
+    FLBacktest-package.R
+    generic.R
+    hcrFn.R
+    hcrICES.R
+    shortcut.R
+    samIndices.R
+    bias.R
+    helpers.R
+    backtest.R
+    results.R
+    looResiduals.R
+    materials.R
+Config/testthat/edition: 3

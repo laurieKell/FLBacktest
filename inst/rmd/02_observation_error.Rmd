@@ -1,0 +1,105 @@
+---
+title: "Supplementary Material: Observation and estimation error"
+subtitle: "Shared OEM text and FLBacktest workflow for peer-reviewed papers"
+author: "Laurence Kell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+  word_document:
+    toc: true
+---
+
+```{r knitr, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      eval = FALSE)
+```
+
+# Purpose
+
+This note documents the three nested **observation / estimation models**
+(OEMs) available in **FLBacktest** for historical HCR backtests. Papers state
+which OEM is the base case and which are sensitivities.
+
+# OEM hierarchy
+
+| Mode | `err` argument | What the MP perceives |
+|------|----------------|------------------------|
+| Perfect information | `NULL` | True OM status and STF with rec. deviations |
+| Short-cut | `FLQuant` of multiplicative bias | OM status × assessment error |
+| Full feedback | `FLIndex` (age / SSB / Rec) | Status from a yearly re-assessment |
+
+All three feed the same HCR (`hcrICES` / `backtest`); only the perceive step
+changes. `err = NULL` is perfect information — there is no separate
+`perfect` argument.
+
+# Perfect information
+
+```{r perfect}
+library(FLBacktest)
+
+# res <- backtest(om, eq, sr_deviances = exp(rsd), params = par,
+#                 method = "perfect", err = NULL,
+#                 start = start, end = end)
+```
+
+Use perfect information to isolate HCR geometry and implementation from
+assessment error. It is **not** a realistic advice process.
+
+# Short-cut assessment error
+
+Retrospective peels supply empirical `now`/`then` bias ratios. An ARIMA
+(or AR(1) fallback) model is fitted and simulated across years and
+iterations to build a multiplicative error `FLQuant`.
+
+```{r shortcut}
+## From a list of FLStocks peels (or FLStocks) keyed by OM
+# bias_df <- retroBias(retros)
+# biasSummary(bias_df)   # optional diagnostic table
+
+## Simulate error for one OM over the backtest window
+# err <- shortcut(bias_df, id = "base", start = start, end = end, nits = 100)
+
+# res <- backtest(om, eq, sr_deviances = exp(rsd), params = par,
+#                 method = "shortcut", err = err,
+#                 start = start, end = end)
+```
+
+Aliases: `shortCutErr()`, `biasFromRetros()`. Prefer the **forecast** package
+for ARIMA; otherwise FLBacktest uses an AR(1) approximation.
+
+# Full feedback (assessment-based MP)
+
+Each advice year the MP re-fits (or updates) an assessment on catch and survey
+data contemporaneous with \(t\), then applies the HCR to assessment estimates.
+Indices are built from the OM with observation noise.
+
+```{r full}
+## Age-structured or aggregated indices for SAM / FLfse
+# idx  <- samIndex(om)          # or samIndexSSB(om), samIndexRec(om)
+# validateSamIndex(idx)
+
+# res <- backtest(om, eq, sr_deviances = exp(rsd), params = par,
+#                 method = "full", err = idx,
+#                 start = start, end = end,
+#                 wgName = "base")   # scenario-grid / naming helper when used
+```
+
+Full feedback requires Suggested packages **FLfse** and **stockassessment**.
+
+# Case-study checklist (fill in host paper)
+
+- Base-case OEM and sensitivity OEMs
+- Peel design (years, software, validation against published assessments)
+- Short-cut: metric biased (usually SSB), ARIMA order / AR(1), iteration count
+- Full: survey construction, CV / noise model, assessment configuration
+  used inside the loop
+- Any estimation natural mortality that differs from the OM
+
+# Software
+
+OEM construction uses **FLBacktest** `retroBias()`, `shortcut()`,
+`samIndex*()`, and `validateSamIndex()`. Closed-loop application is via
+`backtest(..., method = "perfect"|"shortcut"|"full")` or direct `hcrICES()`.

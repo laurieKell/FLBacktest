@@ -1,0 +1,120 @@
+---
+title: "Supplementary Material: Management procedure"
+subtitle: "Shared HCR / closed-loop text and FLBacktest workflow"
+author: "Laurence Kell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+  word_document:
+    toc: true
+---
+
+```{r knitr, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      eval = FALSE)
+```
+
+# Purpose
+
+This note documents the shared **management procedure** (MP): the ICES-style
+hockey-stick harvest control rule (HCR) embedded in a year-by-year historical
+closed loop. Implementation lives in **FLBacktest**; papers state reference
+points, lags, TAC bounds, and the OEM used with the HCR.
+
+# Perceive → advise → implement
+
+For each advice year \(t\) in \([t_0, T]\):
+
+1. **Perceive** stock status under the chosen OEM (perfect, short-cut, or full).
+2. **Advise** catch (or \(F\)) with the HCR and reference points in force at \(t\).
+3. **Implement** the advice on the OM with `FLasher`, optionally with
+   implementation error and year-to-year TAC constraints.
+4. Advance to \(t{+}1\) and repeat.
+
+The result is a counterfactual trajectory under consistent adherence to advice
+as understood at the time.
+
+# Hockey-stick HCR
+
+\[
+F_{\mathrm{advice}}(B) =
+\begin{cases}
+0, & B \le B_{\lim}, \\[4pt]
+F_{\min} + (F_{\mathrm{tar}} - F_{\min})\,
+\dfrac{B - B_{\min}}{B_{\mathrm{trig}} - B_{\min}},
+& B_{\lim} < B < B_{\mathrm{trig}}, \\[4pt]
+F_{\mathrm{tar}}, & B \ge B_{\mathrm{trig}}.
+\end{cases}
+\]
+
+Default mapping for ICES Category 1 advice:
+\(F_{\mathrm{tar}} = F_{\mathrm{MSY}}\),
+\(B_{\mathrm{trig}} = MSYB_{\mathrm{trigger}}\),
+and \(B_{\lim}\) as published for year \(t\). Catch advice is obtained by
+short-term projection of the *perceived* stock at \(F_{\mathrm{advice}}\).
+
+HCR parameters are an `FLPar` with names `ftar`, `fmin`, `btrig`, `bmin`,
+`blim` (build with `hcrParams()` from reference-point series).
+
+# Package API
+
+```{r mp}
+library(FLBacktest)
+
+## Single OM
+# res <- hcrICES(om, eq,
+#                sr_deviances = exp(rsd),
+#                params = par,
+#                start = start, end = end,
+#                interval = 1, lag = 1,
+#                err = NULL,              # or short-cut FLQuant / FLIndex
+#                implErr = 0,
+#                bndTac = c(0.8, 1.25),   # c(0, Inf) disables
+#                bndWhen = "btrig")
+
+## Same via backtest() with method switch
+# res <- backtest(om, eq, sr_deviances = exp(rsd), params = par,
+#                 method = "perfect",   # or "shortcut", "full"
+#                 err = err,
+#                 start = start, end = end,
+#                 bndTac = c(0.8, 1.25))
+
+## Scenario grid (parallel foreach when registered)
+# scen <- expand.grid(om = names(eqs), regime = names(eqs[[1]]),
+#                     stringsAsFactors = FALSE)
+# out  <- backtest(scen, omIters = omIters, eqs = eqs,
+#                  sr_deviances = exp(rsd), params = par,
+#                  method = "shortcut", err = err,
+#                  start = start, end = end, bndTac = c(0.8, 1.25))
+
+## Thin wrappers (same engine)
+# runMSE() / runShortCut() / runFull()
+```
+
+`hcrICES` / `backtest` return a `list`: projected `FLStock` and a
+`data.frame` of HCR-tracked SSB, \(F\), and catch.
+
+# Design rules for application papers
+
+- Do **not** re-implement the hockey-stick loop locally; call `hcrICES` /
+  `backtest`.
+- Keep stock cleaning, SAG parsing, and case-study scenario labels in the
+  application repository.
+- Treat benchmark years as structural breaks when reference points change.
+- State assessment lag, advice lag, and TAC stability rules explicitly.
+
+# Case-study checklist (fill in host paper)
+
+- Backtest window \([t_0, T]\) and advice interval
+- Reference-point time series and benchmark breaks
+- TAC bounds (`bndTac`) and when they apply (`bndWhen`)
+- Implementation error hypothesis (none vs multiplicative)
+- Perfect-management assumption (advised catch = realised catch in the OM)
+
+# Software
+
+Closed-loop MP: **FLBacktest** `hcrICES()`, `backtest()`, `runMSE()`,
+`runShortCut()`, `runFull()`, with projections via **FLasher**.

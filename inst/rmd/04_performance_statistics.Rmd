@@ -1,0 +1,105 @@
+---
+title: "Supplementary Material: Performance statistics"
+subtitle: "Shared metrics text and FLBacktest trajectory extraction"
+author: "Laurence Kell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+  word_document:
+    toc: true
+---
+
+```{r knitr, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      eval = FALSE)
+```
+
+# Purpose
+
+This note documents the **shared** performance-statistic layer for historical
+HCR backtests. **FLBacktest** extracts trajectories; application papers
+aggregate status, risk, yield, and stability summaries (and any stock-specific
+indices such as forage or ABI).
+
+# Trajectory extraction
+
+```{r extract}
+library(FLBacktest)
+
+## From a single backtest / hcrICES result (list) or projected FLStock
+# trj <- backtestResults(res)
+# # columns typically: year, iter, and metrics SSB, Recruits, Yield, F
+
+## Custom metrics (named functions of FLStock)
+# trj <- backtestResults(res, metrics = list(
+#   SSB = ssb, F = fbar, Yield = catch
+# ))
+```
+
+Compare **counterfactual** (closed-loop) trajectories with the **realised**
+historical path over the same years, and across OEM / OM scenarios where
+relevant.
+
+# Core metric families
+
+Papers using the shared backtest report at least:
+
+| Family | Typical statistics |
+|--------|-------------------|
+| **Biological status** | Proportion of years (or probability across iters) with SSB \(< B_{\lim}\), SSB \(< MSYB_{\mathrm{trigger}}\) |
+| **Exploitation** | \(F / F_{\mathrm{MSY}}\) (mean, time above / below 1) |
+| **Yield** | Mean and cumulative catch over the backtest window |
+| **Stability** | Average annual variation (AAV) in catch (and optionally in SSB) |
+| **Risk trade-offs** | Joint summaries of yield versus \(P(B < B_{\lim})\) |
+
+Define each statistic on the same years and iteration set for realised and
+counterfactual series so differences are attributable to the MP path.
+
+# Example aggregations (application-level)
+
+```{r aggregate}
+## Illustrative — keep thresholds and table layout in the host paper
+# library(dplyr)
+#
+# status <- trj |>
+#   group_by(scenario, iter) |>
+#   summarise(
+#     p_blim  = mean(SSB < blim,  na.rm = TRUE),
+#     p_btrig = mean(SSB < btrig, na.rm = TRUE),
+#     mean_F  = mean(F, na.rm = TRUE),
+#     mean_C  = mean(Yield, na.rm = TRUE),
+#     aav_C   = mean(abs(diff(Yield)) / Yield[-length(Yield)], na.rm = TRUE),
+#     .groups = "drop"
+#   )
+```
+
+AAV for a series \(x_t\) is commonly
+\(\mathrm{AAV} = \frac{1}{T-1}\sum_t |x_{t+1}-x_t| / |x_t|\)
+(omit zeros or use a stated alternative if catch is zero).
+
+# Stock-specific extensions
+
+Retain in the application repository (do not fork into FLBacktest unless
+widely reusable):
+
+- Ecosystem / forage indices
+- Age-based indicators (e.g. ABI)
+- Rebuild or recovery time statistics
+- Traffic-light or ERP presentation rules
+
+# Case-study checklist (fill in host paper)
+
+- Years included in each statistic (full window vs post-burn-in)
+- Reference points used for status (fixed terminal vs year-specific advice)
+- Iteration pooling (median across iters, risk probabilities, etc.)
+- Realised vs counterfactual pairing rules
+- Any additional paper-specific indicators and their units
+
+# Software
+
+Trajectory extraction: **FLBacktest** `backtestResults()`. Status, risk, AAV,
+and presentation tables are computed in the application from those
+trajectories (and from the host paper's reference-point series).

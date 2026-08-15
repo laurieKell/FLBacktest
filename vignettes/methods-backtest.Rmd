@@ -1,0 +1,210 @@
+---
+title: "Methods for historical backtests of harvest control rules"
+subtitle: "Reusable methods text for peer-reviewed papers using FLBacktest"
+author: "Laurence Kell"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+  word_document:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Methods for historical HCR backtests}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r knitr, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      eval = FALSE)
+```
+
+# Scope
+
+This document provides a **Methods** section suitable for peer-reviewed papers
+that evaluate harvest control rules (HCRs) with a *historical closed-loop
+backtest*. The procedure is implemented in the FLR package **FLBacktest**.
+Application papers should keep this generic structure and add stock-specific
+detail (assessment model, reference-point series, data windows) in separate
+subsections or supplementary material.
+
+The backtest separates two questions that are often conflated:
+
+1. whether the assessment and advice rule are robust under historical
+   uncertainty; and
+2. whether realised management outcomes differ because advice was not followed.
+
+# Overview of the backtest
+
+For each operating-model stock and each advice year $t$ in a predefined
+historical window $[t_0, T]$:
+
+1. **Perceive.** Form a management-procedure (MP) view of stock status using
+   only information that would have been available at $t$ (perfect
+   information, short-cut assessment error, or a full re-assessment / peel).
+2. **Advise.** Apply the HCR in force at $t$, with that year's reference
+   points, to obtain catch (or $F$) advice for year $t{+}1$.
+3. **Implement.** Project the operating model forward under the advised
+   control, optionally with implementation error.
+4. **Compare.** Contrast the simulated trajectory of spawning-stock biomass
+   (SSB), fishing mortality ($F$), and catch with the realised historical
+   path over the same years.
+
+Repeating steps 1–3 for successive $t$ builds a counterfactual path under
+consistent adherence to advice as it was understood at the time
+[@Punt2016MSE; @Butterworth2014].
+
+# Operating model
+
+The operating model (OM) is an age-structured `FLStock` conditioned on a
+historical assessment (or a set of plausible assessments). Biological
+quantities (weights, maturity, natural mortality, selectivity) follow the
+assessment. A stock–recruitment relationship is fitted and represented as an
+`FLBRP` equilibrium for short-term forecasts and closed-loop projections
+[@Kell2007FLR].
+
+Where robustness is required, multiple OMs may be retained (e.g. alternative
+natural mortality or productivity hypotheses). Stochastic recruitment is
+represented by multiplicative deviations on the stock–recruit scale; papers
+should state whether deviations are treated as aleatory (stationary process)
+or include epistemic trend components.
+
+# Observation and estimation error
+
+Three nested observation models are available. Papers should state which are
+used as base case and sensitivity runs.
+
+## Perfect information
+
+The MP observes true OM SSB (or the metric used by the HCR) without error.
+This isolates HCR behaviour and implementation from assessment error and is a
+useful diagnostic, not a realistic advice process.
+
+## Short-cut assessment error
+
+Assessment error is imposed as a multiplicative process on SSB (or another
+HCR metric), typically conditioned on retrospective peels
+(`now`/`then` ratios). An ARIMA (or AR(1)) model is fitted to the
+retrospective bias series and simulated across years and iterations
+[@ICES2013EqSim; @Kell2016]. Short-cut backtests avoid re-fitting a full
+assessment each year while retaining empirically motivated error magnitude
+and autocorrelation.
+
+## Full feedback (assessment-based MP)
+
+Each year the MP re-fits (or updates) an assessment using contemporaneous
+catch and survey data generated from the OM, then applies the HCR to the
+assessment estimates. Survey indices may be constructed as noisy observations
+of abundance. This full feedback loop is computationally heavier but includes
+observation, estimation, and advice error jointly [@Punt2016MSE].
+
+# Harvest control rule
+
+The base HCR is the ICES Category 1 MSY hockey-stick (Figure 1 conceptually):
+
+$$
+F_{\mathrm{advice}}(B) =
+\begin{cases}
+0, & B \le B_{\lim}, \\[4pt]
+F_{\min} + (F_{\mathrm{tar}} - F_{\min})\,
+\dfrac{B - B_{\min}}{B_{\mathrm{trig}} - B_{\min}},
+& B_{\lim} < B < B_{\mathrm{trig}}, \\[4pt]
+F_{\mathrm{tar}}, & B \ge B_{\mathrm{trig}},
+\end{cases}
+$$
+
+with $F_{\mathrm{tar}} = F_{\mathrm{MSY}}$,
+$B_{\mathrm{trig}} = MSYB_{\mathrm{trigger}}$,
+and $B_{\lim}$ as published for advice year $t$ [@ICES2021Advice].
+Catch advice is obtained by short-term projection of the perceived stock at
+$F_{\mathrm{advice}}$. Optional year-to-year TAC stability constraints
+(e.g. $\pm 20\%$) may be applied when SSB is above a stated threshold.
+
+Reference points are those used for advice in year $t$. Benchmark years are
+treated as structural breaks when $F_{\mathrm{MSY}}$, $B_{\lim}$, or
+$MSYB_{\mathrm{trigger}}$ are redefined.
+
+# Closed-loop projection
+
+Given advised catch (or $F$) for year $t{+}1$, the OM is projected with
+`FLasher` / FLR forward methods under the chosen recruitment deviations
+[@AdamsFLasher]. The loop then advances to $t{+}2$. Management and data lags
+(assessment lag, advice lag, interval between assessments) are stated
+explicitly for each case study.
+
+Perfect-management counterfactuals set realised catch equal to advised catch
+(no TAC overshoot or political override). Implementation error can be added as
+a multiplicative process on catch when that hypothesis is of interest.
+
+# Performance metrics
+
+Realised and counterfactual (or OM) histories are compared using a common set
+of metrics, typically including:
+
+- **Biological status** — proportion of years (or probability across
+  iterations) with SSB below $B_{\lim}$ and below $MSYB_{\mathrm{trigger}}$;
+- **Exploitation** — $F$ relative to $F_{\mathrm{MSY}}$;
+- **Yield and stability** — mean and cumulative catch, and interannual
+  variability (e.g. AAV);
+- **Risk trade-offs** — joint summaries of yield versus probability of falling
+  below limit reference points [@Punt2016MSE].
+
+Stock-specific tables feed any cross-stock synthesis of where adherence to
+advice would have mattered most, versus where assessment revision or
+reference-point change dominates outcomes.
+
+# Software and reproducibility
+
+Analyses use the Fisheries Library in R (FLR): `FLCore`, `FLBRP`, `FLasher`,
+and `ggplotFL` [@Kell2007FLR]. Closed-loop backtests are run with
+**FLBacktest**, principally:
+
+| Method | Role |
+|--------|------|
+| `hcrICES()` / `backtest()` | Year-by-year HCR feedback |
+| `shortcut()` / `retroBias()` | Short-cut error from peels |
+| `samIndex*()` / `omIters()` | Full-feedback assessment inputs |
+| `hcrParams()` | HCR parameters from reference points |
+| `backtestResults()` | Trajectory extraction |
+
+Application repositories should archive conditioned OMs, scenario grids,
+random seeds, and session info so that tables and figures can be regenerated
+from saved `RData` without re-running the full simulation.
+
+# Supplementary material (shared R Markdown)
+
+Modular supplementary notes ship with the package and should be reused across
+papers rather than rewritten:
+
+| Topic | File under `inst/rmd/` |
+|-------|------------------------|
+| Conditioning | `01_conditioning.Rmd` |
+| Observation error | `02_observation_error.Rmd` |
+| Management procedure | `03_management_procedure.Rmd` |
+| Performance statistics | `04_performance_statistics.Rmd` |
+
+Locate installed paths with `backtestMaterials()`. Application papers add only
+case-study checklists (assessment, window, OEM base case, paper-specific
+metrics).
+
+# Case-study subsections (for application papers)
+
+Replace this heading with stock-specific methods, for example:
+
+- Assessment model and peel design (software, data cuts, validation against
+  published advice-year assessments);
+- Historical window $[t_0, T]$, lags, and TAC constraints;
+- Source and time series of reference points;
+- OM conditioning choices (natural mortality, SR hypotheses, recruitment
+  regimes);
+- Which observation model (perfect / short-cut / full) is the base case.
+
+# References {#refs}
+
+<div id="refs"></div>
+
+*Placeholder bibliography keys above should be resolved in the host paper's
+`.bib` file. Suggested citations: Punt et al. (2016) on MSE; ICES advice /
+EqSim guidance; Kell et al. on FLR; case-study assessment reports.*
